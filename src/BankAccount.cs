@@ -6,18 +6,29 @@ namespace classes
   public class BankAccount
   {
     private static int accountNumberSeed = 123456789;
+    private readonly decimal minimumBalance;
     private List<Transaction> allTransaction = new List<Transaction>();
     public string Number { get; }
     public string Owner { get; set; }
-    // public decimal Balance { get; }
 
-    public BankAccount(string name, decimal initialBalance)
+    public BankAccount(string name, decimal initialBalance) : this(name, initialBalance, 0)
+    {
+
+    }
+
+    public BankAccount(string name, decimal initialBalance, decimal minimumBalance)
     {
       this.Number = accountNumberSeed.ToString();
       accountNumberSeed++;
 
       this.Owner = name;
-      MakeDeposit(initialBalance, DateTime.Now, "Initial Balance");
+      this.minimumBalance = minimumBalance;
+      if (initialBalance > 0)
+      {
+        MakeDeposit(initialBalance, DateTime.Now, "Initial Balance");
+      }
+
+
     }
 
     public decimal Balance
@@ -57,13 +68,28 @@ namespace classes
           "Amount of withdrawal must be positive"
         );
       }
-      if (Balance - amount < 0)
+
+      var overdraftTransaction = CheckWithdrawalLimit(Balance - amount < minimumBalance);
+      var withdrawal = new Transaction(-amount, date, note);
+      allTransaction.Add(withdrawal);
+
+      if (overdraftTransaction != null)
+      {
+        allTransaction.Add(overdraftTransaction);
+      }
+    }
+
+    #nullable enable
+    protected virtual Transaction? CheckWithdrawalLimit(bool isOverdrawn)
+    {
+      if (isOverdrawn)
       {
         throw new InvalidOperationException("Not sufficient funds for this withdrawal");
       }
-
-      var withdrawal = new Transaction(-amount, date, note);
-      allTransaction.Add(withdrawal);
+      else
+      {
+        return default;
+      }
     }
 
 
@@ -73,16 +99,20 @@ namespace classes
 
       decimal balance = 0;
       report.AppendLine("Date\tAmount\tBalance\tNote");
-      
+
       foreach (var item in allTransaction)
       {
-          balance += item.Amount;
-          report.AppendLine($"{item.Date.ToShortDateString()}\t" + 
-            $"{item.Amount}\t{balance}\t{item.Notes}"
-          );
+        balance += item.Amount;
+        report.AppendLine($"{item.Date.ToShortDateString()}\t" +
+          $"{item.Amount}\t{balance}\t{item.Notes}"
+        );
       }
 
       return report.ToString();
+    }
+
+    public virtual void PerformMonthEndTransaction()
+    {
 
     }
 
